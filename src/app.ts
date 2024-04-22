@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 //import json from 'body-parser';
 import fetch from 'node-fetch';
-import { Product, CartContent } from './types';
+import { Product, CartContent, User } from './types';
 
 const app = express();
 
@@ -16,11 +16,11 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 app.get('/products', async (req: Request, res: Response) => {
-  
+
   try {
     // Added the select querry param to select specific fields that match the interface
     const response = await fetch('https://dummyjson.com/products?limit=100&select=title,description,price,thumbnail');
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch products');
     }
@@ -44,7 +44,53 @@ app.get('/products', async (req: Request, res: Response) => {
 });
 
 app.post('/login', async (req: Request, res: Response) => {
-  res.send();
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      throw new Error('Username and password are required');
+    }
+
+    const response = await fetch('https://dummyjson.com/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ username, password })
+    });
+
+    /*
+    Choosed to check for the 400 status code because
+    that's what is being returned by the dummyjson API
+    */
+    if (!response.ok) {
+      if (response.status === 400) {
+        throw new Error('Invalid credentials');
+      } else {
+        throw new Error('Failed to authenticate user');
+      }
+    }
+
+    const data: any = await response.json();
+    const user: User = {
+      username: data.username,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      avatar: data.image,
+      token: data.token,
+    }
+
+    res.status(200).json(user);
+  } catch (error: any) {
+    console.error('Error authenticating user:', error);
+    if (error.message === 'Invalid credentials') {
+      res.status(401).json({ error: 'Invalid credentials' });
+    } else if (error.message === 'Username and password are required') {
+      res.status(400).json({ error: 'Missing crendentials' });
+    } else {
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  }
 });
 
 /* app.post('/cart', async (req: Request, res: Response) => {
