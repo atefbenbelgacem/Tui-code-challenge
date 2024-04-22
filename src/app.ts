@@ -1,7 +1,45 @@
 import express, { Request, Response, NextFunction } from 'express';
 //import json from 'body-parser';
 import fetch from 'node-fetch';
-import { Product, CartContent, User } from './types';
+import { Product, CartContent, User, CartPayload } from './types';
+
+const carts: { [customerId: string]: CartContent } = {};
+
+// Authentication middleware
+const authenticate = async (req: Request, res: Response, next: NextFunction) => {
+  const token = req.headers.authorization;
+  let response: any
+
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    response = await fetch('https://dummyjson.com/auth/me', {
+      method: 'GET',
+      headers: {
+        'Authorization': token,
+      },
+    })
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Token Expired!');
+      } else {
+        throw new Error('invalid signature');
+      }
+    }
+
+    const data = await response.json()
+
+    const customerId = data.id
+    req.body = { ...req.body, customerId }
+    next();
+  } catch (error: any) {
+    console.error('Error validating token:', error);
+    res.status(401).json({ error: 'Unauthorized', message: error.message });
+  }
+};
 
 const app = express();
 
@@ -45,7 +83,7 @@ app.get('/products', async (req: Request, res: Response) => {
 
 app.post('/login', async (req: Request, res: Response) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, expiresInMins } = req.body;
 
     if (!username || !password) {
       throw new Error('Username and password are required');
@@ -56,7 +94,7 @@ app.post('/login', async (req: Request, res: Response) => {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({ username, password, expiresInMins })
     });
 
     /*
@@ -93,10 +131,14 @@ app.post('/login', async (req: Request, res: Response) => {
   }
 });
 
-/* app.post('/cart', async (req: Request, res: Response) => {
-  const cartContent: CartContent;
-  res.send(cartContent);
-}); */
+app.post('/cart', authenticate, async (req: Request, res: Response) => {
+  const { customerId } = req.body
+  const { productId } = req.body.cartPayload as CartPayload;
+
+  console.log(customerId, "---------------------------->", productId)
+
+  res.send('hello from cart api');
+});
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.status(404).send();
