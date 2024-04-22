@@ -8,14 +8,13 @@ const carts: { [customerId: string]: CartContent } = {};
 // Authentication middleware
 const authenticate = async (req: Request, res: Response, next: NextFunction) => {
   const token = req.headers.authorization;
-  let response: any
 
   if (!token) {
     return res.status(403).json({ error: 'Unauthorized', message: "Token is mandatory!" });
   }
 
   try {
-    response = await fetch('https://dummyjson.com/auth/me', {
+    const response = await fetch('https://dummyjson.com/auth/me', {
       method: 'GET',
       headers: {
         'Authorization': token,
@@ -30,7 +29,7 @@ const authenticate = async (req: Request, res: Response, next: NextFunction) => 
       }
     }
 
-    const data = await response.json()
+    const data: any = await response.json()
 
     const customerId = data.id
     req.body = { ...req.body, customerId }
