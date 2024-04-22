@@ -11,7 +11,7 @@ const authenticate = async (req: Request, res: Response, next: NextFunction) => 
   let response: any
 
   if (!token) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(403).json({ error: 'Unauthorized', message: "Token is mandatory!" });
   }
 
   try {
@@ -135,9 +135,54 @@ app.post('/cart', authenticate, async (req: Request, res: Response) => {
   const { customerId } = req.body
   const { productId } = req.body.cartPayload as CartPayload;
 
-  console.log(customerId, "---------------------------->", productId)
+  if (!carts[customerId]) {
+    carts[customerId] = { grandTotal: 0, productList: [] };
+  }
 
-  res.send('hello from cart api');
+  const productIndex = carts[customerId].productList.findIndex(product => product.id === productId);
+  if (productIndex !== -1) {
+    return res.status(400).json({ error: 'Product already exists in the cart' });
+  }
+
+  try {
+    const response = await fetch(`https://dummyjson.com/products/${productId}`)
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Product not found');
+      } else {
+        throw new Error('Failed to find product');
+      }
+    }
+
+    const data: any = await response.json();
+
+    const product: Product = {
+      id: data.id,
+      title: data.title,
+      description: data.description,
+      price: data.price,
+      thumbnail: data.thumbnail
+    }
+
+    carts[customerId].productList.push(product);
+    carts[customerId].grandTotal += product.price;
+
+    res.status(200).json({
+      grandTotal: carts[customerId].grandTotal,
+      productList: carts[customerId].productList
+    });
+
+
+  } catch (error: any) {
+    console.error('Error adding to cart:', error);
+    if (error.message === 'Product not found') {
+      res.status(404).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: error.message })
+    }
+  }
+
 });
 
 app.use((req: Request, res: Response, next: NextFunction) => {
